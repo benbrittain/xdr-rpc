@@ -4,18 +4,19 @@ use serde_xdr;
 use tokio_core::io::{Codec, EasyBuf};
 use xdr_rpc;
 use xdr_rpc::HasXid;
+use xdr_rpc::BodyInfo;
 
 enum XdrCodecState {
     AwaitingCall,
     AwaitingBody
 }
 
-pub trait AppCodec : Codec {
+pub trait AppCodec: Codec {
     fn app_decode(&mut self, program: u32, version: u32, procedure: u32,
                   buf: &mut EasyBuf) -> io::Result<Option<Self::In>>;
 }
 
-pub struct XdrCodec<TApp: AppCodec> {
+pub struct XdrCodec<TApp: AppCodec>{
     state: XdrCodecState,
     prog: u32,
     vers: u32,
@@ -96,7 +97,8 @@ impl<TApp: AppCodec> XdrCodec<TApp> {
     }
 }
 
-impl<TApp: AppCodec> Codec for XdrCodec<TApp> {
+impl<TApp> Codec for XdrCodec<TApp>
+    where TApp: AppCodec, TApp::Out: xdr_rpc::BodyInfo {
     type In = xdr_rpc::XdrRequest<TApp::In>;
     type Out = xdr_rpc::XdrResponse<TApp::Out>;
 
@@ -133,7 +135,6 @@ impl<TApp: AppCodec> Codec for XdrCodec<TApp> {
                                     Ok(None)
                                 }
                             }
-                            //Err(io::Error::new(io::ErrorKind::Other, "asdf"))
                         },
                         Err(e) => {
                             Err(e)
@@ -149,19 +150,44 @@ impl<TApp: AppCodec> Codec for XdrCodec<TApp> {
 
     fn encode(&mut self, msg: Self::Out, buf: &mut Vec<u8>) -> io::Result<()> {
         // XXX: for now just accept all calls
-        let reply = xdr_rpc::RpcMsg {
-            xid: msg.get_xid(),
-            body: xdr_rpc::Body::Reply {
-                rbody: xdr_rpc::ReplyBody::MsgAccepted {
-                    areply: xdr_rpc::AcceptedReply {
-                        verf: xdr_rpc::OpaqueAuth {
-                            // XXX: no auth for now
-                            flavor: xdr_rpc::AuthFlavor::AuthNone,
-                            body: Vec::new()
-                        },
-                        // XXX: all calls succeed for now
-                        // bubble up errors later
-                        reply_data: xdr_rpc::ReplyData::Success{}
+        let reply = match msg.get_xid() {
+            Some(xid) => {
+                xdr_rpc::RpcMsg {
+                    xid: xid,
+                    body: xdr_rpc::Body::Reply {
+                        rbody: xdr_rpc::ReplyBody::MsgAccepted {
+                            areply: xdr_rpc::AcceptedReply {
+                                verf: xdr_rpc::OpaqueAuth {
+                                    // XXX: no auth for now
+                                    flavor: xdr_rpc::AuthFlavor::AuthNone,
+                                    body: Vec::new()
+                                },
+                                // XXX: all calls succeed for now
+                                // bubble up errors later
+                                reply_data: xdr_rpc::ReplyData::Success{}
+                            }
+                        }
+                    }
+                }
+            }
+            None => {
+                xdr_rpc::RpcMsg {
+                    xid: 0,
+                    body: xdr_rpc::Body::Call {
+                        cbody: xdr_rpc::CallBody {
+                            rpcvers: msg.val.get_rpc_vers(),
+                            prog: msg.val.get_prog(),
+                            vers: msg.val.get_vers(),
+                            proc_: msg.val.get_proc(),
+                            verf: xdr_rpc::OpaqueAuth {
+                                flavor: xdr_rpc::AuthFlavor::AuthNone,
+                                body: Vec::new()
+                            },
+                            cred: xdr_rpc::OpaqueAuth {
+                                flavor: xdr_rpc::AuthFlavor::AuthNone,
+                                body: Vec::new()
+                            },
+                        }
                     }
                 }
             }

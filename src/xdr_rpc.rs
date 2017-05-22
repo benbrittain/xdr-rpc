@@ -66,6 +66,10 @@ pub struct CallBody {
   pub verf: OpaqueAuth,
 }
 
+
+
+
+
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct AcceptedReply {
   pub verf: OpaqueAuth,
@@ -145,19 +149,49 @@ pub struct XdrRequest<T> {
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub struct XdrResponse<T> {
-    pub xid: u32,
+pub struct XdrResponse<T> where T: BodyInfo {
+    pub xid: u32, // unions encode in a way where we can modify this def and not impact interop
     pub val: T
 }
 
 pub trait HasXid {
-    fn get_xid(&self) -> u32;
+    fn get_xid(&self) -> Option<u32>;
 }
 
-impl<T> HasXid for XdrRequest<T> {
-    fn get_xid(&self) -> u32 { self.xid }
+pub trait BodyInfo {
+    fn get_proc(&self) -> u32;
+    fn get_vers(&self) -> u32;
+    fn get_rpc_vers(&self) -> u32;
+    fn get_prog(&self) -> u32;
 }
 
-impl<T> HasXid for XdrResponse<T> {
-    fn get_xid(&self) -> u32 { self.xid }
+impl BodyInfo for CallBody {
+    fn get_proc(&self) -> u32 {
+        self.proc_
+    }
+    fn get_vers(&self) -> u32 {
+        self.vers
+    }
+    fn get_rpc_vers(&self) -> u32 {
+        self.rpcvers
+    }
+    fn get_prog(&self) -> u32 {
+        self.prog
+    }
+}
+
+impl<T> HasXid for XdrRequest<T> where T: BodyInfo {
+    fn get_xid(&self) -> Option<u32> {
+        Some(self.xid)
+    }
+}
+
+impl<T> HasXid for XdrResponse<T> where T: BodyInfo {
+    fn get_xid(&self) -> Option<u32> {
+        if (self.xid == 0) {
+            None
+        } else {
+            Some(self.xid)
+        }
+    }
 }
