@@ -1,0 +1,19 @@
+[package]
+name = "xdr_rpc"
+version = "0.1.0"
+authors = ["Ben Brittain <ben@okcupid.com>"]
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies.serde_xdr]
+git = "https://github.com/cavedweller/rust-xdr.git"
+
+[dependencies]
+serde = "0.9.1"
+serde_derive = "0.9.1"
+futures = "0.1.13"
+tokio-core = "0.1"
+tokio-io = "0.1"
+tokio-proto = "0.1"
+tokio-service = "0.1"
