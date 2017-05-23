@@ -191,7 +191,7 @@ impl<T> HasXid for XdrResponse<T> where T: BodyInfo {
         if (self.xid == 0) {
             None
         } else {
-            Some(self.xid)
+            Some(4)
         }
     }
 }
